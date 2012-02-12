@@ -24,10 +24,6 @@ lack of STL and even new and delete may turn some people off from
 working with this code, but it has been carefully constructed to be
 usable as widely and as simply as possible.
 
-Currently, Ember opens a TCP listen port and manages connections
-itself.  I plan to add more communication methods, as well as allowing
-the program to provide alternate communication channels itself.
-
 Any number of commands can be registered.  Each command is a function
 that takes an opaque session type and main() style argc/argv
 arguments and returns an int, where 0 indicates "success" and anything
@@ -66,6 +62,10 @@ application such that only one thread is inside any API call at a
 time.  It IS safe to use multiple contexts from multiple threads.
 Each context is entirely independent, Ember keeps no global state.
 
+Currently, Ember opens a TCP listen port and manages connections
+itself.  I plan to add more communication methods, as well as allowing
+the program to provide alternate communication channels itself.
+
 Known Bugs
 ----------
 
@@ -92,6 +92,13 @@ That command could be registered like this:
 For a full working example see examples/hello.c.  Build it ("scons example"), 
 run it ("examples/hello"), then: telnet localhost 10000
 
-Welcome to the ember example
-emb> hello
-Hello, world!
+    Welcome to the ember example
+    emb> hello
+    Hello, world!
+    emb> echo "This is a quoted argument" and these are not.
+    1: This is a quoted argument
+    2: and
+    3: these
+    4: are
+    5: not.
+    emb> 
