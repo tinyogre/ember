@@ -4,13 +4,13 @@
 
 static int s_done = 0;
 
-static int Hello(ember_cmd_ctx ctx, int argc, char **argv)
+static int Hello(ember_session ctx, int argc, const char **argv)
 {
     ember_print(ctx, "Hello, world!\n");
     return 0;
 }
 
-static int Broadcast(ember_cmd_ctx ctx, int argc, char **argv)
+static int Broadcast(ember_session ctx, int argc, const char **argv)
 {
     if(argc < 2) {
         ember_print(ctx, "broadcast requires an argument\n");
@@ -20,7 +20,7 @@ static int Broadcast(ember_cmd_ctx ctx, int argc, char **argv)
     return 0;
 }
 
-static int Quit(ember_cmd_ctx ctx, int argc, char **argv)
+static int Quit(ember_session ctx, int argc, const char **argv)
 {
     s_done = 1;
     return 1;

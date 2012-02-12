@@ -1,16 +1,28 @@
 
 #include "EmberCtx.h"
+#include "EmberMem.h"
+#include "EmberSession.h"
+#include "EmberCommand.h"
+#include "EmberString.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h> 
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <errno.h>
+#include <poll.h>
+#include <ctype.h>
+
+using namespace ember;
 
 EmberCtx::EmberCtx(ember_opt *options) :
     m_options(*options),
     m_listenSock(-1),
     m_lastError(EMBER_OK),
-    m_lastErrorText(NULL)
+    m_lastErrorText(NULL),
+    m_sessionsHead(NULL),
+    m_numSessions(0)
 {
     Init();
 }
@@ -28,6 +40,9 @@ void EmberCtx::Init()
     if(!m_options.freeFn) {
         m_options.freeFn = free;
     }
+
+    m_cmds = (StringMap<EmberCommand> *)Alloc(sizeof(StringMap<EmberCommand>));
+    new(m_cmds) StringMap<EmberCommand>(this, 32);
 }
 
 ember_err EmberCtx::Start()
@@ -67,11 +82,74 @@ ember_err EmberCtx::StartListening(int port)
 
 void EmberCtx::AddCommand(const char *name, ember_cmd_fcn fcn, const char *argFmt, const char *helpText)
 {
+    EmberCommand *cmd = (EmberCommand *)Alloc(sizeof(EmberCommand));
+    new(cmd) EmberCommand(this, name, fcn, argFmt, helpText);
+    m_cmds->Insert(cmd);
+}
+
+ember_err EmberCtx::DoAccept()
+{
+    sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+    int newSock = accept(m_listenSock, (struct sockaddr *)&addr, &addrlen);
+    if(newSock < 0) {
+        return SetLastError(EMBER_ACCEPT_ERROR, strerror(errno));
+    }
+    EmberSession *session = (EmberSession *)m_options.allocFn(sizeof(EmberSession));
+    new(session) EmberSession(this, newSock);
+    session->m_next = m_sessionsHead;
+    m_sessionsHead = session;
+    ++m_numSessions;
+    Log("DoAccept: newSock = %d\n", newSock);
+
+    return EMBER_OK;
 }
 
 int EmberCtx::Poll(int timeoutMS)
 {
-    return 0;
+    if(m_options.pollFn) {
+        // NYI
+        return 0;
+    }
+
+    int numfds = m_numSessions + 1; // +1 for listenSock
+    struct pollfd *fds = (struct pollfd *)alloca(sizeof(pollfd) * numfds);
+    EmberSession **sessions = (EmberSession **)alloca(sizeof(EmberSession *) * numfds);
+    
+    fds[0].fd = m_listenSock;
+    fds[0].events = POLLIN;
+    sessions[0] = NULL;
+    EmberSession *session = m_sessionsHead;
+    for(int i = 0; i < m_numSessions; i++) {
+        fds[i+1].fd = session->m_sock;
+        fds[i+1].events = POLLIN;
+        if(session->PendingWrites()) {
+            fds[i+1].events |= POLLOUT;
+        }
+
+        sessions[i + 1] = session;
+        session = session->m_next;
+    }
+    int ret = poll(fds, numfds, timeoutMS);
+    if(ret > 0) {
+        for(int i = 0; i < numfds; i++) {
+            if(fds[i].revents & POLLIN) {
+                Log("POLLIN: %d\n", fds[i].fd);
+                if(fds[i].fd == m_listenSock) {
+                    DoAccept();
+                } else {
+                    sessions[i]->DoRead();
+                }
+            }
+            if(fds[i].revents & POLLOUT) {
+                Log("POLLOUT: %d\n", fds[i].fd);
+                if(fds[i].fd != m_listenSock) {
+                    sessions[i]->DoWrite();
+                }
+            }
+        }
+    }
+    return ret;
 }
 
 ember_err EmberCtx::SetLastError(ember_err err, const char *text)
@@ -94,4 +172,144 @@ ember_err EmberCtx::GetLastError(char *buf, size_t size)
         strncpy(buf, m_lastErrorText, size);
     }
     return m_lastError;
+}
+
+void EmberCtx::Log(const char *fmt, ...)
+{
+    va_list vl;
+    va_start(vl, fmt);
+
+    // FIXME should be possible to use this with no stdio, get a user provided log function
+    // (But provide a default shim to stdio)
+    vfprintf(stdout, fmt, vl);
+    va_end(vl);
+}
+
+void EmberCtx::ExecuteCommand(EmberSession *session, const char *str)
+{
+    // Count maximum possible number of args quickly by counting spaces, which should always equal or exceed
+    // the actual number of arguments.  Just need to make sure our array is big enough.
+    size_t len = 0;
+    int maxargs = 1;
+    for(const char *c = str; *c; c++) {
+        len++;
+        if(isspace(*c)) {
+            maxargs++;
+            while(isspace(*(c+1))) {
+                c++;
+            }
+        }
+    }
+
+    if(m_argvBufferSize < len + 1) {
+        if(m_argvBuffer) {
+            Free(m_argvBuffer);
+        }
+        m_argvBuffer = (char *)Alloc(len + 1);
+        m_argvBufferSize = len + 1;
+    }
+    strcpy(m_argvBuffer, str);
+
+    if(m_argvArraySize < maxargs) {
+        if(m_argvArray) {
+            Free(m_argvArray);
+        }
+        m_argvArray = (const char **)Alloc(sizeof(const char **) * maxargs);
+        m_argvArraySize = maxargs;
+    }
+
+    
+    int state = 0;
+    int argc = 0;
+    char *currArgStart = m_argvBuffer;
+
+    // Ignore leading whitespace
+    while(isspace(*currArgStart))
+        currArgStart++;
+
+    m_argvArray[argc] = currArgStart;
+    argc = 1;
+    for(char *c = currArgStart; *c; c++) {
+        switch(state) {
+            case 0:
+                if(isspace(*c)) {
+                    *c = 0;
+                    while(isspace(*(c+1))) {
+                        c++;
+                    }
+                    currArgStart = c + 1;
+                    embASSERT(argc < m_argvArraySize);
+                    m_argvArray[argc] = currArgStart;
+                    argc++;
+                } else if(*c == '"') {
+                    state = 1;
+                    strerase(c, 1);
+                } else if(*c == '\'') {
+                    state = 2;
+                    strerase(c, 1);
+                }
+            case 1:
+                if(*c == '"') {
+                    state = 0;
+                    strerase(c, 1);
+                } else if(*c == '\\') {
+                    state = 3;
+                    strerase(c, 1);
+                }
+                break;
+            case 2:
+                if(*c == '\'') {
+                    state = 0;
+                    strerase(c, 1);
+                } else if(*c == '\\') {
+                    state = 4;
+                    strerase(c, 1);
+                }
+                break;
+            case 3:
+                // Double quote, \\ seen
+                state = 1;
+                break;
+            case 4:
+                state = 2;
+                break;
+            default:
+                embASSERT(false);
+                break;
+        }
+    }
+                    
+    Log("ExecuteCommand: %s\n", str);
+    Log("ExecuteCommand: %d args\n", argc);
+    for(int a = 0; a < argc; a++) {
+        Log("Arg %d: \"%s\"\n", a, m_argvArray[a]);
+    }
+    
+    EmberCommand *cmd = m_cmds->Find(m_argvArray[0]);
+    if(!cmd) {
+        session->Print("Unknown command \"%s\"\n", m_argvArray[0]);
+    } else {
+        cmd->Execute(session, argc, m_argvArray);
+    }
+}
+
+void *EmberCtx::Alloc(size_t size)
+{
+    return m_options.allocFn(size);
+}
+
+void EmberCtx::Free(void *ptr)
+{
+    m_options.freeFn(ptr);
+}
+
+char *EmberCtx::StrDup(const char *src)
+{
+    if(!src) {
+        return NULL;
+    }
+
+    char *ptr = (char *)Alloc(strlen(src) + 1);
+    strcpy(ptr, src);
+    return ptr;
 }

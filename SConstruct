@@ -2,9 +2,12 @@
 env = Environment();
 lib_srcs = Split("""
 EmberCtx.cpp
-EmberCmdCtx.cpp
+EmberSession.cpp
 ember.cpp
+EmberString.cpp
 """)
+
+env.Append(CPPFLAGS=['-g'], LINKFLAGS=['-g'])
 
 lib = env.StaticLibrary('ember', lib_srcs);
 

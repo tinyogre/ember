@@ -12,11 +12,11 @@ extern "C" {
 #include "ember_err.h"
 
     typedef void *ember_ctx;
-    typedef void *ember_cmd_ctx;
+    typedef void *ember_session;
     typedef void *ember_socket;
 
     // All commands are implemented by a function of this form
-    typedef int (*ember_cmd_fcn)(ember_cmd_ctx ctx, int argc, char **argv);
+    typedef int (*ember_cmd_fcn)(ember_session ctx, int argc, const char **argv);
 
     typedef size_t (*ember_read_fcn)(void *conn, char *buf, size_t size);
     typedef size_t (*ember_write_fcn)(void *conn, char *buf, size_t size);
@@ -53,10 +53,10 @@ extern "C" {
     int ember_poll(ember_ctx ctx, int timeoutMS);
 
     // Send text to whoever issued the command
-    void ember_print(ember_cmd_ctx ctx, const char *fmt, ...);
+    void ember_print(ember_session ctx, const char *fmt, ...);
 
     // Send text to every connected terminal
-    void ember_broadcast(ember_cmd_ctx ctx, const char *fmt, ...);
+    void ember_broadcast(ember_session ctx, const char *fmt, ...);
 
     ember_err ember_last_error(ember_ctx, char *buf, size_t size);
 

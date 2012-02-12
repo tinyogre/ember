@@ -1,15 +1,15 @@
 
 #include "ember.h"
 #include "EmberCtx.h"
-#include "EmberCmdCtx.h"
+#include "EmberSession.h"
 
 #include <string.h>
 #include <stdlib.h>
 
 // For placement new
-// FIXME - forces us to link with stdc++
-//#include <new>
 
+// Define this ourselves rather than #include <new>, so that we don't force programs
+// linking with this library to also link with stdc++
 void* operator new(size_t size, void* p)
 {
     return p;
@@ -70,9 +70,9 @@ int ember_poll(ember_ctx ctx, int timeoutMS)
 }
 
 // Send text to whoever issued the command
-void ember_print(ember_cmd_ctx ctx, const char *fmt, ...)
+void ember_print(ember_session ctx, const char *fmt, ...)
 {
-    EmberCmdCtx *cmdCtx = static_cast<EmberCmdCtx *>(ctx);
+    EmberSession *cmdCtx = static_cast<EmberSession *>(ctx);
     va_list vl;
     va_start(vl, fmt);
     cmdCtx->VPrint(fmt, vl);
@@ -80,9 +80,9 @@ void ember_print(ember_cmd_ctx ctx, const char *fmt, ...)
 }
 
 // Send text to every connected terminal
-void ember_broadcast(ember_cmd_ctx ctx, const char *fmt, ...)
+void ember_broadcast(ember_session ctx, const char *fmt, ...)
 {
-    EmberCmdCtx *cmdCtx = static_cast<EmberCmdCtx *>(ctx);
+    EmberSession *cmdCtx = static_cast<EmberSession *>(ctx);
     va_list vl;
     va_start(vl, fmt);
     cmdCtx->VBroadcast(fmt, vl);

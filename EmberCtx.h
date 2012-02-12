@@ -4,6 +4,11 @@
 
 #include "ember.h"
 
+class EmberSession;
+template <class T> class StringMap;
+class EmberCommand;
+typedef StringMap<EmberCommand> EmberCommandMap;
+
 class EmberCtx
 {
 private:
@@ -13,8 +18,19 @@ private:
     ember_err m_lastError;
     char *m_lastErrorText;
 
+    EmberSession *m_sessionsHead;
+    int m_numSessions;
+
+    EmberCommandMap *m_cmds;
+
+    const char **m_argvArray;
+    size_t m_argvArraySize;
+    char *m_argvBuffer;
+    size_t m_argvBufferSize;
+
     void Init();
     ember_err StartListening(int port);
+    ember_err DoAccept();
 
 public:
     EmberCtx(ember_opt *options);
@@ -29,6 +45,14 @@ public:
 
     ember_err SetLastError(ember_err err, const char *text);
     ember_err GetLastError(char *buf, size_t size);
+
+    void Log(const char *fmt, ...);
+
+    void ExecuteCommand(EmberSession *session, const char *str);
+
+    void *Alloc(size_t size);
+    void Free(void *ptr);
+    char *StrDup(const char *src);
 };
 
 #endif
