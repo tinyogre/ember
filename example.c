@@ -1,5 +1,6 @@
 
 #include "ember.h"
+#include <stdio.h>
 
 static int s_done = 0;
 
@@ -19,24 +20,32 @@ static int Broadcast(ember_cmd_ctx ctx, int argc, char **argv)
     return 0;
 }
 
-static int Quit(ember_cmd_ctx, int argc, char **argv)
+static int Quit(ember_cmd_ctx ctx, int argc, char **argv)
 {
     s_done = 1;
     return 1;
 }
 
-int main(int, char **)
+int main(int argc, char **argv)
 {
     ember_opt options;
-    ember_opt_init(&options);
-    options.greeting = "Welcome to the ember example\n";
-    options.prompt   = "emb> ";
-    options.port     = 10000;
+    ember_opt_init(&options, sizeof(options));
+    options.greeting   = "Welcome to the ember example\n";
+    options.prompt     = "emb> ";
+    options.listenPort = 10000;
     
     ember_ctx ctx = ember_init(&options);
     ember_add_command(ctx, "Hello", Hello, NULL, "Print the standard greeting");
     ember_add_command(ctx, "Broadcast", Broadcast, "<s/text>", "Send a message to all connected terminals");
     ember_add_command(ctx, "Quit", Quit, NULL, "Quit the example program");
+
+    ember_err err = ember_start(ctx);
+    if(err != EMBER_OK) {
+        char buf[1024];
+        err = ember_last_error(ctx, buf, sizeof(buf));
+        printf("Error %d: %s\n", err, buf);
+        return err;
+    }
 
     while(!s_done) {
         // Wait one second for events
