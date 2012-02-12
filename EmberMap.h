@@ -57,10 +57,14 @@ public:
         StringMap<T> *m_map;
         int m_currBucket;
         T *m_currObj;
+        T *m_next;
 
     public:
         iterator(StringMap<T> *map) :
-            m_map(map)
+            m_map(map),
+            m_currBucket(-1),
+            m_currObj(NULL),
+            m_next(NULL)
         {
         }
 
@@ -68,6 +72,7 @@ public:
             for(m_currBucket = 0; m_currBucket < m_map->m_numBuckets; m_currBucket++) {
                 m_currObj = m_map->m_buckets[m_currBucket];
                 if(m_currObj) {
+                    m_next = m_currObj->GetNext(m_map);
                     return m_currObj;
                 }
             }
@@ -75,13 +80,15 @@ public:
         }
 
         T *Next() {
-            if(m_currObj->GetNext(m_map)) {
-                m_currObj = m_currObj->GetNext(m_map);
+            if(m_next) {
+                m_currObj = m_next;
+                m_next = m_currObj->GetNext(m_map);
                 return m_currObj;
             }
             for(++m_currBucket; m_currBucket < m_map->m_numBuckets; ++m_currBucket) {
                 m_currObj = m_map->m_buckets[m_currBucket];
                 if(m_currObj) {
+                    m_next = m_currObj->GetNext(m_map);
                     return m_currObj;
                 }
             }
@@ -163,6 +170,11 @@ public:
             Remove(obj);
         }
         return obj;
+    }
+
+    void Remove(iterator &it)
+    {
+        Remove(it.Current());
     }
 };
 

@@ -29,7 +29,7 @@ itself.  I plan to add more communication methods, as well as allowing
 the program to provide alternate communication channels itself.
 
 Any number of commands can be registered.  Each command is a function
-that takes an opaque session pointer and main() style argc/argv
+that takes an opaque session type and main() style argc/argv
 arguments and returns an int, where 0 indicates "success" and anything
 else is an error.
  
@@ -66,6 +66,14 @@ application such that only one thread is inside any API call at a
 time.  It IS safe to use multiple contexts from multiple threads.
 Each context is entirely independent, Ember keeps no global state.
 
+Known Bugs
+----------
+
+Does not yet handle non-blocking writes properly, data will be lost if
+sending faster than the socket can accept data.
+
+There's no way to stop log messages from going to stdout yet.
+
 Example
 -------
 This is the simplest command that actually does something:
@@ -76,16 +84,14 @@ This is the simplest command that actually does something:
         return 0;
     }
 
-This command could be registered like this:
+That command could be registered like this:
 
     ember_ctx ctx = ember_init(&options);
     ember_add_command(ctx, "Hello", Hello, NULL, "Print the standard greeting");
 
-For a full working example see examples/hello.c.  Build it, run it, then:
-telnet localhost 10000
+For a full working example see examples/hello.c.  Build it ("scons example"), 
+run it ("examples/hello"), then: telnet localhost 10000
 
 Welcome to the ember example
 emb> hello
 Hello, world!
-emb> brodacast "This message will get sent to everyone"
-Broadcast message: This message will get sent to everyone

@@ -52,4 +52,6 @@ int main(int argc, char **argv)
         ember_poll(ctx, 1000);
         
     }
+
+    ember_destroy(ctx);
 }

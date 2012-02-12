@@ -67,6 +67,9 @@ void EmberSession::Print(const char *fmt, ...)
 
 void EmberSession::VBroadcast(const char *fmt, va_list vl)
 {
+    char buf[MAX_OUTPUT_LINE];
+    vsnprintf(buf, sizeof(buf), fmt, vl);
+    m_ctx->SendBroadcast(buf);
 }
 
 void EmberSession::Reserve(size_t bytes)

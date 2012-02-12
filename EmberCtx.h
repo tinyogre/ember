@@ -57,6 +57,7 @@ public:
     char *StrDup(const char *src);
 
     void SendHelp(EmberSession *sess);
+    void SendBroadcast(const char *text);
 };
 
 #endif

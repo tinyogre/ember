@@ -45,7 +45,14 @@ EmberCtx::~EmberCtx()
         m_sessionsHead = next;
     }
 
-    // FIXME - no iterator for StringMap yet, need to free commands too
+    EmberCommandMap::iterator it(m_cmds);
+    for(it.First(); it.Current(); it.Next()) {
+        EmberCommand *cmd = it.Current();
+        m_cmds->Remove(it);
+        cmd->~EmberCommand();
+        Free(cmd);
+    }
+
     Free(m_cmds);
     close(m_listenSock);
     if(m_lastErrorText) {
@@ -415,3 +422,9 @@ void EmberCtx::SendHelp(EmberSession *sess)
     }
 }
 
+void EmberCtx::SendBroadcast(const char *text)
+{
+    for(EmberSession *sess = m_sessionsHead; sess; sess = sess->m_next) {
+        sess->Send(text);
+    }
+}
