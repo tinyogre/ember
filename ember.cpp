@@ -94,3 +94,9 @@ ember_err ember_last_error(ember_ctx ctx, char *buf, size_t size)
     EmberCtx *em = static_cast<EmberCtx *>(ctx);
     return em->GetLastError(buf, size);
 }
+
+void ember_send_help(ember_session sess)
+{
+    EmberSession *emSess = static_cast<EmberSession *>(sess);
+    emSess->GetCtx()->SendHelp(emSess);
+}

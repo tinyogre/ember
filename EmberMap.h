@@ -53,6 +53,48 @@ public:
         }
     };
 
+    class iterator {
+        StringMap<T> *m_map;
+        int m_currBucket;
+        T *m_currObj;
+
+    public:
+        iterator(StringMap<T> *map) :
+            m_map(map)
+        {
+        }
+
+        T *First() {
+            for(m_currBucket = 0; m_currBucket < m_map->m_numBuckets; m_currBucket++) {
+                m_currObj = m_map->m_buckets[m_currBucket];
+                if(m_currObj) {
+                    return m_currObj;
+                }
+            }
+            return NULL;
+        }
+
+        T *Next() {
+            if(m_currObj->GetNext(m_map)) {
+                m_currObj = m_currObj->GetNext(m_map);
+                return m_currObj;
+            }
+            for(++m_currBucket; m_currBucket < m_map->m_numBuckets; ++m_currBucket) {
+                m_currObj = m_map->m_buckets[m_currBucket];
+                if(m_currObj) {
+                    return m_currObj;
+                }
+            }
+            return NULL;
+        }
+
+        T *Current() {
+            return m_currObj;
+        }
+        
+        T *operator ->() { return m_currObj; }
+    };
+
     StringMap(EmberCtx *ctx, unsigned int initialBuckets = 32) {
         m_ctx = ctx;
         m_numBuckets = initialBuckets;

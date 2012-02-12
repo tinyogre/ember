@@ -6,13 +6,12 @@
 
 class EmberCommand : public SimpleStringMapNode<EmberCommand>
 {
-private:
+public:
     EmberCtx *m_ctx;
     ember_cmd_fcn m_fcn;
     char *m_argFmt;
     char *m_helpText;
 
-public:
     EmberCommand(EmberCtx *ctx, const char *name, ember_cmd_fcn fcn, const char *argFmt, const char *helpText) :
         SimpleStringMapNode<EmberCommand>(ctx, name),
         m_ctx(ctx),

@@ -28,6 +28,7 @@ extern "C" {
         const char *greeting;   // Sent to all clients on initial connect
         const char *prompt;     // Sent whenever ready to read a new command
         int listenPort;         // If ember is managing connections, port to listen on
+        int noStandardCommands; // If true, don't add standard commands like "help"
         ember_read_fcn readFn;  // Functions ember should call to read or write from application managed connections 
         ember_write_fcn writeFn;
         ember_poll_fcn pollFn;
@@ -53,10 +54,13 @@ extern "C" {
     int ember_poll(ember_ctx ctx, int timeoutMS);
 
     // Send text to whoever issued the command
-    void ember_print(ember_session ctx, const char *fmt, ...);
+    void ember_print(ember_session sess, const char *fmt, ...);
 
     // Send text to every connected terminal
-    void ember_broadcast(ember_session ctx, const char *fmt, ...);
+    void ember_broadcast(ember_session sess, const char *fmt, ...);
+
+    // Send list of all commands
+    void ember_send_help(ember_session sess);
 
     ember_err ember_last_error(ember_ctx, char *buf, size_t size);
 

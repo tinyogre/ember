@@ -50,9 +50,13 @@ public:
 
     void ExecuteCommand(EmberSession *session, const char *str);
 
+    void Disconnect(EmberSession *session);
+
     void *Alloc(size_t size);
     void Free(void *ptr);
     char *StrDup(const char *src);
+
+    void SendHelp(EmberSession *sess);
 };
 
 #endif

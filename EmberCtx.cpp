@@ -4,6 +4,7 @@
 #include "EmberSession.h"
 #include "EmberCommand.h"
 #include "EmberString.h"
+#include "StandardCommands.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +14,8 @@
 #include <errno.h>
 #include <poll.h>
 #include <ctype.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 using namespace ember;
 
@@ -29,6 +32,25 @@ EmberCtx::EmberCtx(ember_opt *options) :
 
 EmberCtx::~EmberCtx()
 {
+    if(m_argvBuffer) {
+        Free(m_argvBuffer);
+    }
+    if(m_argvArray) {
+        Free(m_argvArray);
+    }
+    while(m_sessionsHead) {
+        EmberSession *next = m_sessionsHead->m_next;
+        m_sessionsHead->~EmberSession();
+        Free(m_sessionsHead);
+        m_sessionsHead = next;
+    }
+
+    // FIXME - no iterator for StringMap yet, need to free commands too
+    Free(m_cmds);
+    close(m_listenSock);
+    if(m_lastErrorText) {
+        Free(m_lastErrorText);
+    }
 }
 
 void EmberCtx::Init()
@@ -43,6 +65,10 @@ void EmberCtx::Init()
 
     m_cmds = (StringMap<EmberCommand> *)Alloc(sizeof(StringMap<EmberCommand>));
     new(m_cmds) StringMap<EmberCommand>(this, 32);
+
+    if(!m_options.noStandardCommands) {
+        AddStandardCommands(this);
+    }
 }
 
 ember_err EmberCtx::Start()
@@ -53,6 +79,23 @@ ember_err EmberCtx::Start()
     }
     return err;
 }
+
+static int setNonblocking(int fd)
+{
+    int flags;
+
+    /* If they have O_NONBLOCK, use the Posix way to do it */
+#if defined(O_NONBLOCK)
+    /* Fixme: O_NONBLOCK is defined but broken on SunOS 4.1.x and AIX 3.2.5. */
+    if (-1 == (flags = fcntl(fd, F_GETFL, 0)))
+        flags = 0;
+    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+#else
+    /* Otherwise, use the old way of doing it */
+    flags = 1;
+    return ioctl(fd, FIOBIO, &flags);
+#endif
+}     
 
 ember_err EmberCtx::StartListening(int port)
 {
@@ -65,6 +108,8 @@ ember_err EmberCtx::StartListening(int port)
     if(setsockopt(m_listenSock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) != 0) {
         return SetLastError(EMBER_CANT_SETSOCKOPT, strerror(errno));
     }
+
+    setNonblocking(m_listenSock);
 
     struct sockaddr_in addr;
     memset(&addr, sizeof(addr), 0);
@@ -95,6 +140,9 @@ ember_err EmberCtx::DoAccept()
     if(newSock < 0) {
         return SetLastError(EMBER_ACCEPT_ERROR, strerror(errno));
     }
+
+    setNonblocking(newSock);
+
     EmberSession *session = (EmberSession *)m_options.allocFn(sizeof(EmberSession));
     new(session) EmberSession(this, newSock);
     session->m_next = m_sessionsHead;
@@ -103,6 +151,25 @@ ember_err EmberCtx::DoAccept()
     Log("DoAccept: newSock = %d\n", newSock);
 
     return EMBER_OK;
+}
+
+void EmberCtx::Disconnect(EmberSession *session)
+{
+    Log("Disconnect: session %p, sock=%d\n", session, session->m_sock);
+    EmberSession *prev = NULL;
+    for(EmberSession *chk = m_sessionsHead; chk; chk = chk->m_next) {
+        if(chk == session) {
+            if(prev) {
+                prev->m_next = session->m_next;
+            } else {
+                m_sessionsHead = session->m_next;
+            }
+            break;
+        }
+    }
+    session->~EmberSession();
+    Free(session);
+    m_numSessions--;
 }
 
 int EmberCtx::Poll(int timeoutMS)
@@ -133,18 +200,28 @@ int EmberCtx::Poll(int timeoutMS)
     int ret = poll(fds, numfds, timeoutMS);
     if(ret > 0) {
         for(int i = 0; i < numfds; i++) {
-            if(fds[i].revents & POLLIN) {
-                Log("POLLIN: %d\n", fds[i].fd);
+            if(fds[i].revents & (POLLHUP | POLLERR)) {
+                if(sessions[i]) {
+                    Disconnect(sessions[i]);
+                    sessions[i] = NULL;
+                    continue;
+                }
+            }
+            if(fds[i].revents & (POLLIN | POLLERR | POLLHUP)) {
                 if(fds[i].fd == m_listenSock) {
                     DoAccept();
-                } else {
-                    sessions[i]->DoRead();
+                } else if(sessions[i]) {
+                    if(sessions[i]->DoRead()) {
+                        sessions[i] = NULL;
+                    }
                 }
             }
             if(fds[i].revents & POLLOUT) {
                 Log("POLLOUT: %d\n", fds[i].fd);
-                if(fds[i].fd != m_listenSock) {
-                    sessions[i]->DoWrite();
+                if(fds[i].fd != m_listenSock && sessions[i]) {
+                    if(sessions[i]->DoWrite()) {
+                        sessions[i] = NULL;
+                    }
                 }
             }
         }
@@ -218,7 +295,9 @@ void EmberCtx::ExecuteCommand(EmberSession *session, const char *str)
         m_argvArraySize = maxargs;
     }
 
-    
+    // FIXME this does stupid string shifting for quotes and such, why didn't I just
+    // copy it as I parsed it instead of using strcpy above?
+
     int state = 0;
     int argc = 0;
     char *currArgStart = m_argvBuffer;
@@ -244,33 +323,45 @@ void EmberCtx::ExecuteCommand(EmberSession *session, const char *str)
                 } else if(*c == '"') {
                     state = 1;
                     strerase(c, 1);
+                    c--;
                 } else if(*c == '\'') {
                     state = 2;
                     strerase(c, 1);
+                    c--;
                 }
+                break;
             case 1:
+                // Reading double quoted argument
                 if(*c == '"') {
                     state = 0;
                     strerase(c, 1);
+                    c--;
                 } else if(*c == '\\') {
                     state = 3;
                     strerase(c, 1);
+                    c--;
                 }
                 break;
             case 2:
+                // Reading single quoted argument
                 if(*c == '\'') {
                     state = 0;
                     strerase(c, 1);
+                    c--;
                 } else if(*c == '\\') {
                     state = 4;
                     strerase(c, 1);
+                    c--;
                 }
                 break;
             case 3:
                 // Double quote, \\ seen
+                // FIXME handle \n, \t, etc.
                 state = 1;
                 break;
             case 4:
+                // Single quote, \\ seen
+                // FIXME handle \n, \t, etc.
                 state = 2;
                 break;
             default:
@@ -287,7 +378,9 @@ void EmberCtx::ExecuteCommand(EmberSession *session, const char *str)
     
     EmberCommand *cmd = m_cmds->Find(m_argvArray[0]);
     if(!cmd) {
-        session->Print("Unknown command \"%s\"\n", m_argvArray[0]);
+        if(m_argvArray[0][0]) {
+            session->Print("Unknown command \"%s\"\n", m_argvArray[0]);
+        }
     } else {
         cmd->Execute(session, argc, m_argvArray);
     }
@@ -313,3 +406,12 @@ char *EmberCtx::StrDup(const char *src)
     strcpy(ptr, src);
     return ptr;
 }
+
+void EmberCtx::SendHelp(EmberSession *sess)
+{
+    EmberCommandMap::iterator it(m_cmds);
+    for(it.First(); it.Current(); it.Next()) {
+        sess->Print("%20s %20s - %s\n", it->GetKey(NULL), it->m_argFmt ? it->m_argFmt : "", it->m_helpText ? it->m_helpText : "");
+    }
+}
+

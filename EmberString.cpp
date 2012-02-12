@@ -17,8 +17,9 @@ ember::hash(const unsigned char *str)
 
 void ember::strerase(char *dest, int numChars)
 {
-    for(char *d = dest, *s = dest + numChars; *s; d++, s++) {
+    char *d, *s;
+    for(d = dest, s = dest + numChars; *s; d++, s++) {
         *d = *s;
     }
+    *d = 0;
 }
-

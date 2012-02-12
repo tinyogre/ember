@@ -1,14 +1,19 @@
 
 env = Environment();
 lib_srcs = Split("""
+ember.cpp
 EmberCtx.cpp
 EmberSession.cpp
-ember.cpp
 EmberString.cpp
+StandardCommands.cpp
 """)
 
-env.Append(CPPFLAGS=['-g'], LINKFLAGS=['-g'])
+env.Append(CPPFLAGS=['-g'], LINKFLAGS=['-g'], CPPPATH=['#'])
 
 lib = env.StaticLibrary('ember', lib_srcs);
 
-example = env.Program('example.c', LIBS=['ember'], LIBPATH='.')
+env.Alias('all', lib)
+env.Default(lib)
+
+env.Export(['env'])
+env.SConscript('examples/SConscript')

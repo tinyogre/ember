@@ -6,6 +6,8 @@
 
 namespace ember {
     unsigned int hash(const unsigned char *str);
+
+    // Delete numChars from dest, by shifting the string numChars to the left
     void strerase(char *dest, int numChars);
 
     const size_t MAX_OUTPUT_LINE = 2048;

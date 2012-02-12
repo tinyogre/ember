@@ -20,7 +20,7 @@ protected:
     void Reserve(size_t bytes);
     void AddInput(const char *buf, size_t bytes);
 
-    void Send(const char *buf, size_t len);
+    void Send(const char *buf, int len = -1);
 
 public:
     EmberSession(EmberCtx *ctx, int sock);
@@ -30,9 +30,11 @@ public:
     void VPrint(const char *fmt, va_list vl);
     void VBroadcast(const char *fmt, va_list vl);
 
-    void DoRead();
-    void DoWrite();
+    bool DoRead();
+    bool DoWrite();
     bool PendingWrites();
+
+    EmberCtx *GetCtx() { return m_ctx; }
 };
 
 #endif
