@@ -41,8 +41,8 @@ To build the examples:
 
 $ scons example
 
-Currently, Ember has only been tested on MacOS 10.7, but I intend to
-support Linux and Windows soon.
+Currently, Ember has been tested on MacOS 10.7 and Linux (Mint 12).  I
+do intend to support Windows soon.
 
 Limitations
 -----------
