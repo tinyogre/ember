@@ -385,9 +385,13 @@ void EmberCtx::ExecuteCommand(EmberSession *session, const char *str)
     
     EmberCommand *cmd = m_cmds->Find(m_argvArray[0]);
     if(!cmd) {
-        if(m_argvArray[0][0]) {
-            session->Print("Unknown command \"%s\"\n", m_argvArray[0]);
-        }
+		if(m_options.errorFn) {
+			m_options.errorFn(session, argc, m_argvArray);
+		} else {
+			if(m_argvArray[0][0]) {
+				session->Print("Unknown command \"%s\"\n", m_argvArray[0]);
+			}
+		}
     } else {
         cmd->Execute(session, argc, m_argvArray);
     }

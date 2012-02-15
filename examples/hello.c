@@ -26,6 +26,12 @@ static int Quit(ember_session ses, int argc, const char **argv)
     return 1;
 }
 
+static int Error(ember_session ses, int argc, const char **argv)
+{
+	ember_print(ses, "%s isn't a valid command, don't do that again\n", argv[0]);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
     ember_opt options;
@@ -33,7 +39,8 @@ int main(int argc, char **argv)
     options.greeting   = "Welcome to the ember example\n";
     options.prompt     = "emb> ";
     options.listenPort = 10000;
-    
+	options.errorFn    = Error;
+
     ember_ctx ctx = ember_init(&options);
     ember_add_command(ctx, "Hello", Hello, NULL, "Print the standard greeting");
     ember_add_command(ctx, "Broadcast", Broadcast, "<s/text>", "Send a message to all connected terminals");
