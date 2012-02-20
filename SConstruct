@@ -13,7 +13,8 @@ env.Append(CPPFLAGS=['-g'], LINKFLAGS=['-g'], CPPPATH=['#'])
 lib = env.StaticLibrary('ember', lib_srcs);
 
 env.Alias('all', lib)
-env.Default(lib)
+env.Alias('lib', lib)
+env.Default('all')
 
 env.Export(['env'])
 env.SConscript('examples/SConscript')

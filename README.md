@@ -29,17 +29,23 @@ that takes an opaque session type and main() style argc/argv
 arguments and returns an int, where 0 indicates "success" and anything
 else is an error.
  
+I don't have a particular application for which I am going to use
+Ember at this point in time, but it's the kind of thing I (and others)
+have written and rewritten in different forms for different projects
+several times over the years.  Next time, I'll be ready.  Maybe you
+will be too!
+
 Building
 --------
 Ember uses scons as its build system, which you can get from http://scons.org
 
-To build the library:
+To build everything:
 
 $ scons
 
-To build the examples:
-
-$ scons example
+Besides the library, that will build the examples in the examples
+directory, as well as a simple curses based client in the client
+directory.
 
 Currently, Ember has been tested on MacOS 10.7 and Linux (Mint 12).  I
 do intend to support Windows soon.
@@ -102,3 +108,15 @@ run it ("examples/hello"), then: telnet localhost 10000
     4: are
     5: not.
     emb> 
+
+Future
+------
+
+One of ember's goals is to be accesible using plain old telnet or nc
+or any plain text terminal.  However, a client such as the one in the
+client directory may be able to provide more advanced input methods
+and can make your life easier.  I would like to provide readline-like
+functionality even when connected directly with telnet, but it was
+turning out to be trickier than I thought, so I wrote the client
+program as a workaround.  It doesn't yet have any actual readline like
+functionality, but it using curses for screen I/O.  It's a start.

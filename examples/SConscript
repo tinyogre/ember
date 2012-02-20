@@ -2,3 +2,4 @@ Import('*')
 
 hello = env.Program('hello.c', LIBS=['ember', 'curses'], LIBPATH='#')
 env.Alias('example', hello)
+env.Alias('all', hello)
