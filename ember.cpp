@@ -72,10 +72,10 @@ int ember_poll(ember_ctx ctx, int timeoutMS)
 // Send text to whoever issued the command
 void ember_print(ember_session ctx, const char *fmt, ...)
 {
-    EmberSession *cmdCtx = static_cast<EmberSession *>(ctx);
+    EmberSession *cmdSess = static_cast<EmberSession *>(ctx);
     va_list vl;
     va_start(vl, fmt);
-    cmdCtx->VPrint(fmt, vl);
+    cmdSess->VPrint(fmt, vl);
     va_end(vl);
 }
 

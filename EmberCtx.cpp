@@ -420,9 +420,10 @@ char *EmberCtx::StrDup(const char *src)
 
 void EmberCtx::SendHelp(EmberSession *sess)
 {
+	sess->Print("help!");
     EmberCommandMap::iterator it(m_cmds);
     for(it.First(); it.Current(); it.Next()) {
-        sess->Print("%20s %20s - %s\n", it->GetKey(NULL), it->m_argFmt ? it->m_argFmt : "", it->m_helpText ? it->m_helpText : "");
+        sess->Print("%20s %20s - %s", it->GetKey(NULL), it->m_argFmt ? it->m_argFmt : "", it->m_helpText ? it->m_helpText : "");
     }
 }
 

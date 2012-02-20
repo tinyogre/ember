@@ -16,7 +16,7 @@ static int Ping(ember_session sess, int argc, const char **argv)
 static int Echo(ember_session sess, int argc, const char **argv)
 {
     for(int i = 1; i < argc; i++) {
-        ember_print(sess, "%d: %s\n", i, argv[i]);
+        ember_print(sess, "%d: %s", i, argv[i]);
     }
     return 0;
 }

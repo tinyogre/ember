@@ -6,17 +6,17 @@ static int s_done = 0;
 
 static int Hello(ember_session ses, int argc, const char **argv)
 {
-    ember_print(ses, "Hello, world!\n");
+    ember_print(ses, "Hello, world!");
     return 0;
 }
 
 static int Broadcast(ember_session ses, int argc, const char **argv)
 {
     if(argc < 2) {
-        ember_print(ses, "broadcast requires an argument\n");
+        ember_print(ses, "broadcast requires an argument");
     }
 
-    ember_broadcast(ses, "Broadcast message: %s\n", argv[1]);
+    ember_broadcast(ses, "Broadcast message: %s", argv[1]);
     return 0;
 }
 
@@ -28,7 +28,7 @@ static int Quit(ember_session ses, int argc, const char **argv)
 
 static int Error(ember_session ses, int argc, const char **argv)
 {
-	ember_print(ses, "%s isn't a valid command, don't do that again\n", argv[0]);
+	ember_print(ses, "%s isn't a valid command, don't do that again", argv[0]);
 	return 0;
 }
 
@@ -36,7 +36,10 @@ int main(int argc, char **argv)
 {
     ember_opt options;
     ember_opt_init(&options, sizeof(options));
-    options.greeting   = "Welcome to the ember example\n";
+	// Octal junk is telnet-ese for forcing character mode
+	// http://stackoverflow.com/questions/273261/force-telnet-client-into-character-mode
+    //options.greeting   = "\377\375\042\377\373\001Welcome to the ember example\n";
+	options.greeting   = "Welcome to the ember example\n";
     options.prompt     = "emb> ";
     options.listenPort = 10000;
 	options.errorFn    = Error;

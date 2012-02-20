@@ -6,12 +6,25 @@
 
 class EmberCtx;
 
+#define EMBER_USE_CURSES 0
+
+#ifdef EMBER_USE_CURSES
+#include <stdio.h>
+#include <curses.h>
+#endif
+
 class EmberSession
 {
 protected:
     EmberCtx *m_ctx;
     EmberSession *m_next;
     int m_sock;
+
+#if EMBER_USE_CURSES
+	FILE *m_cursesFile;
+	SCREEN *m_screen;
+#endif
+
     friend class EmberCtx;
     char *m_inputBuf;
     size_t m_inputBufUsed;

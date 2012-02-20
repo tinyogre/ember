@@ -1,4 +1,4 @@
 Import('*')
 
-hello = env.Program('hello.c', LIBS=['ember'], LIBPATH='#')
+hello = env.Program('hello.c', LIBS=['ember', 'curses'], LIBPATH='#')
 env.Alias('example', hello)

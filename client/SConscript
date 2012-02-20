@@ -1,0 +1,6 @@
+Import('*')
+
+client = env.Program('client.c', LIBS=['curses'], LIBPATH='#')
+env.Alias('client', client)
+env.Alias('all', client)
+

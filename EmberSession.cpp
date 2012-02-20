@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <errno.h>
 
+#if EMBER_USE_CURSES
+#include <curses.h>
+#endif
+
 using namespace ember;
 
 EmberSession::EmberSession(EmberCtx *ctx, int sock) :
@@ -25,6 +29,17 @@ EmberSession::EmberSession(EmberCtx *ctx, int sock) :
     if(ctx->GetOptions().prompt) {
         Send(ctx->GetOptions().prompt);
     }
+
+#if EMBER_USE_CURSES
+	m_cursesFile = fdopen(m_sock, "r+b");
+	if(m_cursesFile) {
+		m_screen = newterm((char *)"vt100", m_cursesFile, m_cursesFile);
+		set_term(m_screen);
+		nonl();
+		cbreak();
+		noecho();
+	}
+#endif
 }
 
 EmberSession::~EmberSession()
@@ -44,7 +59,13 @@ void EmberSession::Send(const char *buf, int len)
     }
 
     if(len > 0 && m_sock >= 0) {
+#if EMBER_USE_CURSES
+		SCREEN *old = set_term(m_screen);
+		addstr(buf);
+		set_term(old);
+#else
         write(m_sock, buf, len);
+#endif
     }
 }
 
@@ -53,6 +74,7 @@ void EmberSession::VPrint(const char *fmt, va_list vl)
     char buf[MAX_OUTPUT_LINE];
     vsnprintf(buf, sizeof(buf), fmt, vl);
     Send(buf);
+	Send("\n\r");
 }
 
 void EmberSession::Print(const char *fmt, ...)
@@ -63,6 +85,7 @@ void EmberSession::Print(const char *fmt, ...)
     vsnprintf(buf, sizeof(buf), fmt, vl);
     va_end(vl);
     Send(buf);
+	Send("\n\r");
 }
 
 void EmberSession::VBroadcast(const char *fmt, va_list vl)
@@ -70,6 +93,7 @@ void EmberSession::VBroadcast(const char *fmt, va_list vl)
     char buf[MAX_OUTPUT_LINE];
     vsnprintf(buf, sizeof(buf), fmt, vl);
     m_ctx->SendBroadcast(buf);
+	m_ctx->SendBroadcast("\r\n");
 }
 
 void EmberSession::Reserve(size_t bytes)
@@ -97,6 +121,8 @@ void EmberSession::AddInput(const char *buf, size_t bytes)
     m_inputBufUsed += bytes;
     m_inputBuf[m_inputBufUsed] = 0;
 
+	//printf("%d:%s\n", (int)m_inputBufUsed, m_inputBuf);
+
     // If multiple commands are parsed, don't send a new prompt until after the last one
     bool executed = false;
     for(int c = 0; c < m_inputBufUsed; c++) {
@@ -123,8 +149,26 @@ void EmberSession::AddInput(const char *buf, size_t bytes)
 bool EmberSession::DoRead()
 {
     char buf[1024];
+#if EMBER_USE_CURSES
+	SCREEN *old = set_term(m_screen);
+	int c = getch();
+	if(c == ERR) {
+		if(feof(m_cursesFile)) {
+            m_ctx->Log("Disconnect: session %p: (%d) %s", this, errno, strerror(errno));
+            m_ctx->Disconnect(this);
+			set_term(old);
+			return true;
+		}
+	} else {
+		buf[0] = c;
+		buf[1] = 0;
+		AddInput(buf, 1);
+	}
+	set_term(old);
+#else
     int r = read(m_sock, buf, sizeof(buf));
     if(r > 0) {
+		buf[r] = 0;
         AddInput(buf, (size_t)r);
     } else if(r < 0) {
         if(errno == EINTR || errno == EAGAIN) {
@@ -136,6 +180,7 @@ bool EmberSession::DoRead()
             return true;
         }
     }
+#endif
     return false;
 }
 

@@ -17,3 +17,4 @@ env.Default(lib)
 
 env.Export(['env'])
 env.SConscript('examples/SConscript')
+env.SConscript('client/SConscript')
